@@ -11,15 +11,17 @@ py -m venv venv
 
 ## 2. Активация окружения
 
-### Через **cmd**
+### Через **PowerShell**
 
-```cmd
-venv\Scriptsctivate.bat
+```powershell
+.venv\Scripts\Activate.ps1
 ```
 
 ## 3. Установка зависимостей
 
-
 ```bash
 pip install -r requirements.txt
 ```
+## 4. Запуск
+
+## в VS code при просмотре файла .ipynb в правом верхнем углу появляется кнопка выбора виртуальной среды, выбираете свою и запускаете ячейки
