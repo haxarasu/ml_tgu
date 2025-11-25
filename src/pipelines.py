@@ -2,7 +2,9 @@
 import matplotlib.pyplot as plt  # библиотека для визуализации дерева
 from sklearn.model_selection import train_test_split # функция для разбиения данных на train, test
 from sklearn.preprocessing import StandardScaler # скалирование признаков для нормального обучения логистической регрессии
+from sklearn.decomposition import PCA # метод главных компонент для ужатия пространства
 from sklearn.neural_network import MLPClassifier # полносвязная нейронная сеть
+from sklearn.cluster import KMeans # алгоритм k-means для кластеризации
 from sklearn.tree import DecisionTreeClassifier, plot_tree # алгоритм решающего дерева и функция для его отрисовки
 from sklearn.ensemble import RandomForestClassifier # отсюда и ниже алгоритмы обучения моделей
 from sklearn.linear_model import LogisticRegression
@@ -34,6 +36,34 @@ class Splitter:
             random_state=self.random_state,
         )
         
+
+# классы выглядят почти одинаково, в целом можно инкапуслировать
+"""
+class BaseModel(Splitter):
+
+    # базовый класс для моделей без скалирования.
+  
+    def __init__(self, X, y, test_ratio: float = 0.2, random_state: int | None = None) -> None:
+        super().__init__(X, y, test_ratio=test_ratio, random_state=random_state)
+        self.model = None  # сюда будут класться конкретные модели
+
+    def fit(self, model_cls, **params):
+        # создаёт и обучает переданную модель на обучающей выборке
+        model = model_cls(**params)
+        model.fit(self.X_train, self.y_train)
+        self.model = model
+
+        return model
+
+    def predict(self, X):
+        # проверяет, что модель уже обучена
+        if self.model is None:
+            raise ValueError("модель не обучена, сначала вызовите fit()")
+
+        return self.model.predict(X)
+"""
+# и аналогично для моделей со скалированием через standardscaler с вызовом scale_features
+# но хз насколько вам и преподу это надо, мб на защите только больше запутаетесь
 
 class Boosters(Splitter): # наследует Splitter
     """
@@ -271,3 +301,89 @@ class NeuralNet(Splitter):
         preds = self.nn_model.predict(X_scaled)
 
         return preds
+
+
+# ===== Класс для кластеризации с помощью k-means и визуализации в 2d/3d =====
+class KMeansClustering:
+    """
+    класс для кластеризации с помощью k-means, с ужатием пространства и визуализацией в 2d и 3d.
+    """
+    def __init__(self, X, n_clusters: int = 3, random_state: int | None = None, scale: bool = True) -> None:
+        # сохраняет параметры кластеризации
+        self.n_clusters = n_clusters
+        self.random_state = random_state
+        self.scale = scale
+
+        # по желанию скалирует признаки перед обучением k-means
+        if self.scale:
+            X_scaled, self.scaler = scale_features(X)
+            self.X = X_scaled
+        else:
+            self.X = X
+            self.scaler = None
+
+        # атрибуты для хранения обученной модели и проекций пространства
+        self.kmeans_model = None
+        self.pca_2d = None
+        self.pca_3d = None
+        self.X_2d = None
+        self.X_3d = None
+
+
+    def fit(self, **kwargs):
+        # создаёт и обучает модель k-means на всём наборе данных
+        params = {
+            "n_clusters": self.n_clusters,
+            "random_state": self.random_state,
+            "n_init": "auto",
+        }
+
+        # позволяет переопределить гиперпараметры при запуске
+        params.update(**kwargs)
+
+        model = KMeans(**params)
+        model.fit(self.X)
+        self.kmeans_model = model
+
+        # строит pca-проекции в 2d и 3d для визуализации кластеров
+        self.pca_2d = PCA(n_components=2, random_state=self.random_state)
+        self.X_2d = self.pca_2d.fit_transform(self.X)
+
+        self.pca_3d = PCA(n_components=3, random_state=self.random_state)
+        self.X_3d = self.pca_3d.fit_transform(self.X)
+
+        return model
+
+
+    def plot_2d(self, figsize=(8, 6)):
+        # визуализирует результат кластеризации в 2d после pca-ужатия
+        if self.kmeans_model is None or self.X_2d is None:
+            raise ValueError("сначала нужно обучить модель, вызвав fit()")
+
+        labels = self.kmeans_model.labels_
+
+        plt.figure(figsize=figsize)
+        plt.scatter(self.X_2d[:, 0], self.X_2d[:, 1], c=labels, s=20)
+        plt.xlabel("pc1")
+        plt.ylabel("pc2")
+        plt.title("k-means кластеры в 2d pca-пространстве")
+        plt.tight_layout()
+        plt.show()
+
+
+    def plot_3d(self, figsize=(8, 6)):
+        # визуализирует результат кластеризации в 3d после pca-ужатия
+        if self.kmeans_model is None or self.X_3d is None:
+            raise ValueError("сначала нужно обучить модель, вызвав fit()")
+
+        labels = self.kmeans_model.labels_
+
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot(111, projection="3d")
+        ax.scatter(self.X_3d[:, 0], self.X_3d[:, 1], self.X_3d[:, 2], c=labels, s=20)
+        ax.set_xlabel("pc1")
+        ax.set_ylabel("pc2")
+        ax.set_zlabel("pc3")
+        ax.set_title("k-means кластеры в 3d pca-пространстве")
+        plt.tight_layout()
+        plt.show()
