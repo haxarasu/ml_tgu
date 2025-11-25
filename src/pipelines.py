@@ -2,12 +2,23 @@
 import matplotlib.pyplot as plt  # библиотека для визуализации дерева
 from sklearn.model_selection import train_test_split # функция для разбиения данных на train, test
 from sklearn.preprocessing import StandardScaler # скалирование признаков для нормального обучения логистической регрессии
+from sklearn.neural_network import MLPClassifier # полносвязная нейронная сеть
 from sklearn.tree import DecisionTreeClassifier, plot_tree # алгоритм решающего дерева и функция для его отрисовки
 from sklearn.ensemble import RandomForestClassifier # отсюда и ниже алгоритмы обучения моделей
 from sklearn.linear_model import LogisticRegression
 from catboost import CatBoostClassifier 
 from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
+
+def scale_features(X):
+    """
+    скалирует признаки с помощью standardscaler и возвращает скалированные данные и объект скалера.
+    """
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    return X_scaled, scaler
+
 
 class Splitter:
     def __init__(self, X, y, test_ratio: float = 0.2, random_state: int | None = None) -> None:
@@ -173,8 +184,8 @@ class LogisticBinary(Splitter):
     класс для решения задачи бинарной классификации с помощью логистической регрессии.
     """
     def __init__(self, X, y, test_ratio: float = 0.2, random_state: int | None = None) -> None:
-        # скалирование признаков
-        X_scaled = StandardScaler().fit_transform(X)
+        # скалирует признаки и сохраняет объект скалера
+        X_scaled, self.scaler = scale_features(X)
         # вызывает базовый класс, который делает разбиение на train и test
         super().__init__(X_scaled, y, test_ratio=test_ratio, random_state=random_state)
 
@@ -205,7 +216,58 @@ class LogisticBinary(Splitter):
         if self.logreg_model is None:
             raise ValueError("модель логистической регрессии не обучена, сначала вызовите fit()")
 
-        # возвращает предсказания обученной модели логистической регрессии
-        preds = self.logreg_model.predict(X)
+        # масштабирует входные данные так же, как обучающую выборку
+        X_scaled = self.scaler.transform(X)
+        preds = self.logreg_model.predict(X_scaled)
+
+        return preds
+
+
+class NeuralNet(Splitter):
+    """
+    класс для решения задачи классификации с помощью полносвязной нейронной сети.
+    """
+    def __init__(self, X, y, test_ratio: float = 0.2, random_state: int | None = None) -> None:
+        # сохраняет random_state для воспроизводимости
+        self.random_state = random_state
+
+        # скалирует признаки и сохраняет объект скалера
+        X_scaled, self.scaler = scale_features(X)
+
+        # вызывает базовый класс, который делает разбиение на train и test
+        super().__init__(X_scaled, y, test_ratio=test_ratio, random_state=random_state)
+
+        # атрибут для хранения обученной модели нейронной сети
+        self.nn_model = None
+
+
+    def fit(self, **kwargs):
+        # создаёт и обучает модель полносвязной нейронной сети на обучающей выборке
+        params = {
+            "hidden_layer_sizes": (64, 32),
+            "activation": "relu",
+            "solver": "adam",
+            "random_state": self.random_state,
+            "max_iter": 200,
+        }
+
+        # позволяет докинуть или изменить гиперпараметры при запуске
+        params.update(**kwargs)
+
+        model = MLPClassifier(**params)
+        model.fit(self.X_train, self.y_train)
+        self.nn_model = model
+
+        return model
+
+
+    def predict(self, X):
+        # проверяет, что модель нейронной сети уже обучена
+        if self.nn_model is None:
+            raise ValueError("модель нейронной сети не обучена, сначала вызовите fit()")
+
+        # масштабирует входные данные так же, как обучающую выборку
+        X_scaled = self.scaler.transform(X)
+        preds = self.nn_model.predict(X_scaled)
 
         return preds
