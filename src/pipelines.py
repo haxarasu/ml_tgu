@@ -1,0 +1,211 @@
+# импорты
+import matplotlib.pyplot as plt  # библиотека для визуализации дерева
+from sklearn.model_selection import train_test_split # функция для разбиения данных на train, test
+from sklearn.preprocessing import StandardScaler # скалирование признаков для нормального обучения логистической регрессии
+from sklearn.tree import DecisionTreeClassifier, plot_tree # алгоритм решающего дерева и функция для его отрисовки
+from sklearn.ensemble import RandomForestClassifier # отсюда и ниже алгоритмы обучения моделей
+from sklearn.linear_model import LogisticRegression
+from catboost import CatBoostClassifier 
+from lightgbm import LGBMClassifier
+from xgboost import XGBClassifier
+
+class Splitter:
+    def __init__(self, X, y, test_ratio: float = 0.2, random_state: int | None = None) -> None:
+        # сохраняет параметры разбиения и random_state (для детерменированности)
+        self.test_ratio = test_ratio
+        self.random_state = random_state
+
+        # делит исходные данные на обучающую и тестовую выборки
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+            X,
+            y,
+            test_size=self.test_ratio,
+            random_state=self.random_state,
+        )
+        
+
+class Boosters(Splitter): # наследует Splitter
+    """
+    класс для обучения моделей: принимает X и y, делит их на обучающую и тестовую выборки.
+    """
+    def __init__(self, X, y, test_ratio: float = 0.2) -> None:
+        # вызывает базовый класс, который делает разбиение на train и test
+        super().__init__(X, y, test_ratio=test_ratio)
+
+        # атрибуты для хранения обученных моделей
+        self.catboost_model = None
+        self.lightgbm_model = None
+        self.xgboost_model = None
+
+
+    def train_catboost(self):
+        # создаёт и обучает модель catboost на обучающей выборке
+        model = CatBoostClassifier(verbose=False) # False чтобы не выводил всякую инфу (нам не нужна)
+        model.fit(self.X_train, self.y_train)
+        self.catboost_model = model
+
+        return model
+
+
+    def train_lightgbm(self):
+        # создаёт и обучает модель lightgbm на обучающей выборке
+        model = LGBMClassifier(verbose=-1) # то же что и False в CatBoost 
+        model.fit(self.X_train, self.y_train)
+        self.lightgbm_model = model
+
+        return model
+
+
+    def train_xgboost(self):
+        # создаёт и обучает модель xgboost на обучающей выборке
+        # xgboost ожидает на вход label как [0, 1, 2], а получает [1, 2, 3], нужно поменять
+        y_train_zero_based = self.y_train - self.y_train.min()
+
+        model = XGBClassifier(verbosity=1) # выведет только предупреждения, с параметрами verbose/verbosity в моделях можете поиграться чтобы не было одинакового кода и вывода у всех
+        model.fit(self.X_train, y_train_zero_based)
+        self.xgboost_model = model
+
+        return model
+
+
+    def predict_catboost(self, X):
+        # проверяет, что модель catboost уже обучена
+        if self.catboost_model is None:
+            raise ValueError("модель catboost не обучена, сначала вызовите train_catboost()")
+        return self.catboost_model.predict(X)
+
+
+    def predict_lightgbm(self, X):
+        # проверяет, что модель lightgbm уже обучена
+        if self.lightgbm_model is None:
+            raise ValueError("модель lightgbm не обучена, сначала вызовите train_lightgbm()")
+        return self.lightgbm_model.predict(X)
+
+
+    def predict_xgboost(self, X):
+        # проверяет, что модель xgboost уже обучена
+        if self.xgboost_model is None:
+            raise ValueError("модель xgboost не обучена, сначала вызовите train_xgboost()")
+        return self.xgboost_model.predict(X)
+
+
+
+class DTree(Splitter): # наследует Splitter
+    """
+    класс для обучения и визуализации модели решающего дерева.
+    """
+    def __init__(self, X, y, test_ratio: float = 0.2, random_state: int | None = None) -> None:
+        # вызывает базовый класс, который делает разбиение на train и test
+        super().__init__(X, y, test_ratio=test_ratio, random_state=random_state)
+
+        # сохраняет имена признаков
+        self.feature_names = list(X.columns)
+
+        # атрибут для хранения обученной модели дерева
+        self.tree_model = None
+
+
+    def train_tree(self, **kwargs):
+        # создаёт и обучает модель решающего дерева на обучающей выборке
+        params = {
+            "max_depth": 3,
+            "random_state": self.random_state,
+        }
+        # позволяет переопределить аргументы при запуске 
+        params.update(**kwargs)
+
+        model = DecisionTreeClassifier(**params)
+        model.fit(self.X_train, self.y_train)
+        self.tree_model = model
+
+        return model
+
+
+    def plot_tree(self, figsize=(12, 8)):
+        # визуализирует обученное решающее дерево с помощью matplotlib
+        if self.tree_model is None:
+            raise ValueError("модель дерева не обучена, сначала вызовите train_tree()")
+
+        plt.figure(figsize=figsize)
+        plot_tree(
+            self.tree_model,
+            feature_names=self.feature_names,
+            filled=True,
+            rounded=True,
+            fontsize=8,
+        )
+        plt.tight_layout()
+        plt.show()
+
+
+class RandomForest(Splitter):
+    """
+    класс для обучения модели случайного леса.
+    """
+    def __init__(self, X, y, test_ratio: float = 0.2, random_state: int | None = None) -> None:
+        # вызывает базовый класс, который делает разбиение на train и test
+        super().__init__(X, y, test_ratio=test_ratio, random_state=random_state)
+
+        # атрибут для хранения обученной модели случайного леса
+        self.random_forest_model = None
+
+
+    def train_random_forest(self, **kwargs):
+        # создаёт и обучает модель случайного леса на обучающей выборке
+        params = {
+            "n_estimators": 100,
+            "random_state": self.random_state,
+            "n_jobs": -1,
+        }
+
+        # позволяет переопределить гиперпараметры при запуске
+        params.update(**kwargs)
+
+        model = RandomForestClassifier(**params)
+        model.fit(self.X_train, self.y_train)
+        self.random_forest_model = model
+
+        return model
+
+
+class LogisticBinary(Splitter):
+    """
+    класс для решения задачи бинарной классификации с помощью логистической регрессии.
+    """
+    def __init__(self, X, y, test_ratio: float = 0.2, random_state: int | None = None) -> None:
+        # скалирование признаков
+        X_scaled = StandardScaler().fit_transform(X)
+        # вызывает базовый класс, который делает разбиение на train и test
+        super().__init__(X_scaled, y, test_ratio=test_ratio, random_state=random_state)
+
+        # атрибут для хранения обученной модели логистической регрессии
+        self.logreg_model = None
+
+
+    def fit(self, **kwargs):
+        # создаёт и обучает модель логистической регрессии на обучающей выборке
+        params = {
+            "random_state": self.random_state,
+            "n_jobs": -1,
+            "max_iter": 5000,
+        }
+
+        # позволяет докинуть/изменить гиперпараметры при запуске
+        params.update(**kwargs)
+
+        model = LogisticRegression(**params)
+        model.fit(self.X_train, self.y_train)
+        self.logreg_model = model
+
+        return model
+
+
+    def predict(self, X):
+        # проверяет, что модель логистической регрессии уже обучена
+        if self.logreg_model is None:
+            raise ValueError("модель логистической регрессии не обучена, сначала вызовите fit()")
+
+        # возвращает предсказания обученной модели логистической регрессии
+        preds = self.logreg_model.predict(X)
+
+        return preds

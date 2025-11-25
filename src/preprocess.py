@@ -232,3 +232,41 @@ class DataCleaner:
             result = result.fillna(self.fill_value)
 
         return result
+
+
+    def select_training_columns(
+        self,
+        df: pd.DataFrame,
+        target_column: str = "label",
+        drop_constant: bool = True,
+    ) -> pd.DataFrame:
+        """
+        выбирает столбцы для обучения модели.
+
+        параметры
+        df : pd.DataFrame
+            таблица с данными (признаки + целевой столбец).
+        target_column : str, по умолчанию "label"
+            имя столбца с целевой переменной, который исключает из признаков.
+        drop_constant : bool, по умолчанию True
+            если True, выкидывает столбцы, у которых 0 или 1 уникальное значение.
+
+        возвращает
+        pd.DataFrame
+            таблица, содержащая только данные для обучения.
+        """
+        # работает с копией, чтобы не трогать исходные данные
+        df_copy = df.copy()
+
+        # если указан столбец с целевой переменной и он присутствует в данных — исключает его
+        if target_column in df_copy.columns:
+            df_copy = df_copy.drop(columns=[target_column])
+
+        # приводит все оставшиеся признаки к типу float64
+        features = df_copy.astype("float64")
+
+        if drop_constant:
+            # оставляет только признаки, у которых больше одного уникального значения
+            features = features.loc[:, features.nunique() > 1]
+
+        return features
