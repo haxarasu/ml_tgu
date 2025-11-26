@@ -14,16 +14,6 @@ from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
 
 
-def scale_features(X: Any) -> Tuple[Any, StandardScaler]:
-    """
-    скалирует признаки с помощью standardscaler и возвращает скалированные данные и объект скалера.
-    """
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-
-    return X_scaled, scaler
-
-
 def train_with_grid_search(
     estimator,
     X_train,
@@ -66,29 +56,33 @@ def train_with_grid_search(
     return best_model
 
 
-class Splitter:
-    def __init__(self, X: Any, y: Any, test_ratio: float = 0.2, random_state: Optional[int] = None) -> None:
-        # сохраняет параметры разбиения и random_state (для детерменированности)
-        self.test_ratio = test_ratio
-        self.random_state = random_state
+def split_data(
+    X: Any,
+    y: Any,
+    test_ratio: float = 0.2,
+    random_state: Optional[int] = None,
+) -> Tuple[Any, Any, Any, Any]:
+    """
+    разбивает данные на обучающую и тестовую выборки.
+    возвращает X_train, X_test, y_train, y_test.
+    """
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=test_ratio,
+        random_state=random_state,
+    )
 
-        # делит исходные данные на обучающую и тестовую выборки
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            X,
-            y,
-            test_size=self.test_ratio,
-            random_state=self.random_state,
-        )
+    return X_train, X_test, y_train, y_test
         
 
 # классы выглядят почти одинаково, логику можно инкапуслировать
 """
-class BaseModel(Splitter):
+class BaseModel:
 
     # базовый класс для моделей без скалирования.
   
     def __init__(self, X, y, test_ratio: float = 0.2, random_state: Optional[int] = None) -> None:
-        super().__init__(X, y, test_ratio=test_ratio, random_state=random_state)
         self.model = None  # сюда будут класться конкретные модели
 
     def fit(self, model_cls, **params):
@@ -109,10 +103,19 @@ class BaseModel(Splitter):
 # и аналогично для моделей со скалированием через вызов scale_features
 # но хз насколько вам и преподу это надо, мб на защите только больше запутаетесь
 
-class Boosters(Splitter): # наследует Splitter
+class Boosters:
     def __init__(self, X: Any, y: Any, test_ratio: float = 0.2) -> None:
-        # вызывает базовый класс, который делает разбиение на train и test
-        super().__init__(X, y, test_ratio=test_ratio)
+        # сохраняет параметры разбиения
+        self.test_ratio = test_ratio
+        self.random_state = None
+
+        # делит исходные данные на обучающую и тестовую выборки
+        self.X_train, self.X_test, self.y_train, self.y_test = split_data(
+            X,
+            y,
+            test_ratio=self.test_ratio,
+            random_state=self.random_state,
+        )
 
         # атрибуты для хранения обученных моделей
         self.catboost_model = None
@@ -181,16 +184,25 @@ class Boosters(Splitter): # наследует Splitter
         return model
 
 
-class DTree(Splitter): # наследует Splitter
+class DTree:
     """
     класс для обучения и визуализации модели решающего дерева.
     """
     def __init__(self, X: Any, y: Any, test_ratio: float = 0.2, random_state: Optional[int] = None) -> None:
-        # вызывает базовый класс, который делает разбиение на train и test
-        super().__init__(X, y, test_ratio=test_ratio, random_state=random_state)
+        # сохраняет параметры разбиения и random_state
+        self.test_ratio = test_ratio
+        self.random_state = random_state
 
         # сохраняет имена признаков
         self.feature_names = list(X.columns)
+
+        # делит исходные данные на обучающую и тестовую выборки
+        self.X_train, self.X_test, self.y_train, self.y_test = split_data(
+            X,
+            y,
+            test_ratio=self.test_ratio,
+            random_state=self.random_state,
+        )
 
         # атрибут для хранения обученной модели дерева
         self.tree_model = None
@@ -238,13 +250,22 @@ class DTree(Splitter): # наследует Splitter
         plt.show()
 
 
-class RandomForest(Splitter):
+class RandomForest:
     """
     класс для обучения модели случайного леса.
     """
     def __init__(self, X: Any, y: Any, test_ratio: float = 0.2, random_state: Optional[int] = None) -> None:
-        # вызывает базовый класс, который делает разбиение на train и test
-        super().__init__(X, y, test_ratio=test_ratio, random_state=random_state)
+        # сохраняет параметры разбиения и random_state
+        self.test_ratio = test_ratio
+        self.random_state = random_state
+
+        # делит исходные данные на обучающую и тестовую выборки
+        self.X_train, self.X_test, self.y_train, self.y_test = split_data(
+            X,
+            y,
+            test_ratio=self.test_ratio,
+            random_state=self.random_state,
+        )
 
         # атрибут для хранения обученной модели случайного леса
         self.random_forest_model = None
@@ -277,15 +298,27 @@ class RandomForest(Splitter):
         return model
 
 
-class LogisticBinary(Splitter):
+class LogisticBinary:
     """
     класс для решения задачи бинарной классификации с помощью логистической регрессии.
     """
     def __init__(self, X: Any, y: Any, test_ratio: float = 0.2, random_state: Optional[int] = None) -> None:
-        # скалирует признаки и сохраняет объект скалера
-        X_scaled, self.scaler = scale_features(X)
-        # вызывает базовый класс, который делает разбиение на train и test
-        super().__init__(X_scaled, y, test_ratio=test_ratio, random_state=random_state)
+        # сохраняет параметры разбиения и random_state
+        self.test_ratio = test_ratio
+        self.random_state = random_state
+
+        # делит исходные данные на обучающую и тестовую выборки на «сырых» признаках
+        self.X_train, self.X_test, self.y_train, self.y_test = split_data(
+            X,
+            y,
+            test_ratio=self.test_ratio,
+            random_state=self.random_state,
+        )
+
+        # создаёт скалер и обучает его только на обучающей выборке
+        self.scaler = StandardScaler()
+        self.X_train = self.scaler.fit_transform(self.X_train)
+        self.X_test = self.scaler.transform(self.X_test)
 
         # атрибут для хранения обученной модели логистической регрессии
         self.logreg_model = None
@@ -330,19 +363,27 @@ class LogisticBinary(Splitter):
         return preds
 
 
-class NeuralNet(Splitter):
+class NeuralNet:
     """
     класс для решения задачи классификации с помощью полносвязной нейронной сети.
     """
     def __init__(self, X: Any, y: Any, test_ratio: float = 0.2, random_state: Optional[int] = None) -> None:
         # сохраняет random_state для воспроизводимости
         self.random_state = random_state
+        self.test_ratio = test_ratio
 
-        # скалирует признаки и сохраняет объект скалера
-        X_scaled, self.scaler = scale_features(X)
+        # делит исходные данные на обучающую и тестовую выборки на «сырых» признаках
+        self.X_train, self.X_test, self.y_train, self.y_test = split_data(
+            X,
+            y,
+            test_ratio=self.test_ratio,
+            random_state=self.random_state,
+        )
 
-        # вызывает базовый класс, который делает разбиение на train и test
-        super().__init__(X_scaled, y, test_ratio=test_ratio, random_state=random_state)
+        # создаёт скалер и обучает его только на обучающей выборке
+        self.scaler = StandardScaler()
+        self.X_train = self.scaler.fit_transform(self.X_train)
+        self.X_test = self.scaler.transform(self.X_test)
 
         # атрибут для хранения обученной модели нейронной сети
         self.nn_model = None
@@ -401,11 +442,10 @@ class KMeansClustering:
 
         # по желанию скалирует признаки перед обучением k-means
         if self.scale:
-            X_scaled, self.scaler = scale_features(X)
-            self.X = X_scaled
+            scaler = StandardScaler()
+            self.X = scaler.fit_transform(X)
         else:
             self.X = X
-            self.scaler = None
 
         # атрибуты для хранения обученной модели и проекций пространства
         self.kmeans_model = None
