@@ -21,12 +21,6 @@ class SurfaceDataLoader:
     """
 
     def __init__(self, base_path: str = "../datasets") -> None:
-        """
-        путь к папке с файлами .csv.
-        значение "../datasets" означает:
-        - ..  -> подняться на одну папку выше относительно текущего файла
-        - затем зайти в папку datasets
-        """
         self.base_path = base_path
 
         # имена файлов с данными по каждой поверхности
@@ -61,7 +55,7 @@ class SurfaceDataLoader:
 
         df = pd.read_csv(
             filepath,
-            sep=";",         
+            sep=";",
             header=None,      
             low_memory=False 
         )
@@ -145,10 +139,6 @@ class DataCleaner:
     fill_value : Any, по умолчанию 0
         значение, которым будут заполняться пропуски, если выбрана стратегия
         "fill". может быть числом, строкой и т.п.
-
-    как используется: (пример)
-    cleaner = DataCleaner(missing_strategy="fill", fill_value=0)
-    df_clean = cleaner.clean(df)
     """
 
     def __init__(self, missing_strategy: str = "drop", fill_value: Any = None) -> None:

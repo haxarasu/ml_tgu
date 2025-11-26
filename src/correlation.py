@@ -82,7 +82,7 @@ class CorrelationAnalyzer:
         corr_matrix : pd.DataFrame]
             заранее посчитанная матрица корреляций.
         threshold : float
-            порог по модулю корреляции. пары с |corr| >= threshold считаются "сильно" связанными.
+            порог по модулю корреляции. пары с |corr| >= threshold считаются сильно связанными.
 
         возвращает
         pd.DataFrame
@@ -96,8 +96,8 @@ class CorrelationAnalyzer:
         # получает список всех признаков
         columns = list(corr_matrix.columns)
 
-        # как вот эта ебань работает лучше у нейронки спросите, тут или рисовать или паста текста по которому все равно непонятно
-        # совсем коротко - пробег по верхнему треугольнику матрицы, не включая диагональ
+        # как вот эта ебань работает лучше у нейронки спросите
+        # пробег по верхнему треугольнику матрицы, не включая диагональ
         for i, col_i in enumerate(columns):
             for j in range(i + 1, len(columns)):
                 col_j = columns[j]                         
@@ -128,7 +128,7 @@ class CorrelationAnalyzer:
     def plot_correlation_heatmap(
         self,
         corr_matrix: pd.DataFrame,
-        figsize: tuple[float, float] = (10.0, 8.0),
+        figsize: tuple[int, int] = (10, 8),
     ) -> None:
         """
         рисует тепловую карту (heatmap) матрицы корреляций — аналог imagesc из matlab.
@@ -154,7 +154,7 @@ class CorrelationAnalyzer:
         plt.xticks(range(len(feature_names)), feature_names, rotation=90)
         plt.yticks(range(len(feature_names)), feature_names)
 
-        # чуть плотнее размещает элементы, чтобы подписи не обрезались
+        # плотнее размещает элементы, чтобы подписи не обрезались
         plt.tight_layout()
 
         # отображает рисунок
