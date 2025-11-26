@@ -1,3 +1,22 @@
+### Структура
+
+ml_tgu/
+├── datasets/                 # данные
+│   ├── gray_surface.csv      
+│   ├── green_surface.csv    
+│   └── table_surface.csv   
+│
+├── src/                      
+│   ├── preprocess.py         # загрузка данных, очистка, выбор признаков
+│   ├── correlation.py        # корреляционный анализ и тепловая карта
+│   ├── pipelines.py          # модели (CatBoost/LightGBM/XGBoost, деревья, logreg, NN, k-means)
+│   └── evaluation.py         # оценка моделей (accuracy, precision, f1, ROC-AUC)
+│
+├── main.ipynb                # основной ноутбук с запуском всех шагов
+├── requirements.txt          # зависимости проекта
+├── README.md                 # описание проекта и инструкция по запуску
+└── .gitignore                # файлы и папки, не попадающие в git
+
 ## 1. Создание venv
 
 ### В папке с проектом:
